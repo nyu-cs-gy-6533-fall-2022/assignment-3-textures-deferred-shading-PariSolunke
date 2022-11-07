@@ -31,6 +31,10 @@
 BufferObject VBO;
 // VertexBufferObject wrapper
 BufferObject NBO;
+
+// VertexBufferObject wrapper
+BufferObject TBO;
+
 // VertexBufferObject wrapper
 BufferObject IndexBuffer;
 
@@ -40,6 +44,9 @@ std::vector<glm::vec3> V(3);
 std::vector<glm::vec3> VN(3);
 // Contains the vertex positions
 std::vector<glm::ivec3> T(3);
+
+std::vector<glm::vec2> texcoords;
+
 
 // Last position of the mouse on click
 double xpos, ypos;
@@ -416,6 +423,8 @@ int main(void)
     VBO.init();
     // initialize normal array buffer
     NBO.init();
+    // initialize texture array buffer
+    TBO.init();
     // initialize element array buffer
     IndexBuffer.init(GL_ELEMENT_ARRAY_BUFFER);
     // initialize model matrix
@@ -427,6 +436,12 @@ int main(void)
     sphere(1.0f, 20, 10, V, VN, T);
     VBO.update(V);
     NBO.update(VN);
+    
+    for(int i=0; i<VN.size(); i++){
+        texcoords.push_back(glm::vec2(atan2(VN[i].x, VN[i].z) / (2. * M_PI) + 0.5, -asin(VN[i].y) / M_PI + .5 ));
+    }
+
+    TBO.update(texcoords);
     IndexBuffer.update(T);
 
     // load PPM image file
@@ -501,6 +516,21 @@ int main(void)
     // in the vertex shader
     program.bindVertexAttribArray("position", VBO);
     program.bindVertexAttribArray("normal", NBO);
+    program.bindVertexAttribArray("texCoords", TBO);
+
+
+    unsigned int texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);  
+    
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.w, image.h, 0, GL_RGB, GL_UNSIGNED_BYTE, &image.data[0]);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
 
     // Register the keyboard callback
     glfwSetKeyCallback(window, key_callback);
@@ -558,6 +588,8 @@ int main(void)
         
         // Draw a triangle
         //glDrawArrays(GL_TRIANGLES, 0, V.size());
+
+        glBindTexture(GL_TEXTURE_2D, texture);
         glDrawElements(GL_TRIANGLES, T.size() * 3, GL_UNSIGNED_INT, 0);
 
         // Swap front and back buffers
@@ -571,6 +603,7 @@ int main(void)
     program.free();
     VAO.free();
     VBO.free();
+    TBO.free();
 
     // Deallocate glfw internals
     glfwTerminate();
