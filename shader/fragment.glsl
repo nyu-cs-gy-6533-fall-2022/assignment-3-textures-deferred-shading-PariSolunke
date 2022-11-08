@@ -1,6 +1,6 @@
-#version 150 core
+#version 330 core
 
-out vec4 outColor;
+layout(location = 0) out vec3 outColor;
 
 in vec3 n;
 in vec3 color;
@@ -30,6 +30,6 @@ void main()
         vec3(1.0) * pow(max(0.0, dot( normalize(camPos - pos), normalize( reflect(-lightDir, normal)))), lightParams.y),
         0.0, 1.0);
     
-    outColor = vec4(col, 1.0);
+    outColor = col;
    
 }   

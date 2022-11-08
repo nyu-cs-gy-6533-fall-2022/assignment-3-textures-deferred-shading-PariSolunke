@@ -29,6 +29,7 @@
 
 // VertexBufferObject wrapper
 BufferObject VBO;
+BufferObject VBO2;
 // VertexBufferObject wrapper
 BufferObject NBO;
 
@@ -522,15 +523,74 @@ int main(void)
     unsigned int texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);  
-    
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.w, image.h, 0, GL_RGB, GL_UNSIGNED_BYTE, &image.data[0]);
     glGenerateMipmap(GL_TEXTURE_2D);
+    
+    VertexArrayObject VAO2;
+    VAO2.init();
+    VAO2.bind();
+    Program program2;
+    // load fragment shader file 
+    std::ifstream fragShaderFile2("../shader/fragment2.glsl");
+    std::stringstream fragCode2;
+    fragCode2 << fragShaderFile2.rdbuf();
+    // load vertex shader file
+    std::ifstream vertShaderFile2("../shader/vertex2.glsl");
+    std::stringstream vertCode2;
+    vertCode2 << vertShaderFile2.rdbuf();
 
+    program2.init(vertCode2.str(), fragCode2.str(), "outColor");
+    program2.bind();
+    VBO2.init();
+    VBO2.bind();
+    std::vector<glm::vec3> quadVertices;
+    quadVertices.push_back(glm::vec3(-1.0f, -1.0f, 0.0f));
+    quadVertices.push_back(glm::vec3(1.0f, -1.0f, 0.0f));
+    quadVertices.push_back(glm::vec3(-1.0f,  1.0f, 0.0f));
+    quadVertices.push_back(glm::vec3(-1.0f,  1.0f, 0.0f));
+    quadVertices.push_back(glm::vec3( 1.0f, -1.0f, 0.0f));
+    quadVertices.push_back(glm::vec3(1.0f,  1.0f, 0.0f));
+    VBO2.update(quadVertices);
+    program2.bindVertexAttribArray("position", VBO2);
+    
+    
+    
+    // The framebuffer, which regroups 0, 1, or more textures, and 0 or 1 depth buffer.
+	GLuint FramebufferName = 0;
+	glGenFramebuffers(1, &FramebufferName);
+	glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
+
+    
+	// The texture we're going to render to
+	GLuint renderedTexture;
+	glGenTextures(1, &renderedTexture);
+	
+	// "Bind" the newly created texture : all future texture functions will modify this texture
+	glBindTexture(GL_TEXTURE_2D, renderedTexture);
+
+	glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, 800, 600, 0,GL_RGB, GL_UNSIGNED_BYTE, 0);
+
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); 
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    
+	// Set "renderedTexture" as our colour attachement #0
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderedTexture, 0);
+
+	// Set the list of draw buffers.
+	GLenum DrawBuffers[1] = {GL_COLOR_ATTACHMENT0};
+	glDrawBuffers(1, DrawBuffers); // "1" is the size of DrawBuffers
+
+	// Always check that our framebuffer is ok
+	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	    return false;
+    
 
     // Register the keyboard callback
     glfwSetKeyCallback(window, key_callback);
@@ -554,10 +614,17 @@ int main(void)
         // Get the size of the window
         int width, height;
         glfwGetWindowSize(window, &width, &height);
+        
+        glEnable(GL_DEPTH_TEST);
+    	glEnable(GL_CULL_FACE);
+
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
+		glViewport(0,0,width,height);
 
         // matrix calculations
         viewMatrix = glm::lookAt(cameraPos, cameraTarget, cameraUp);
-        projMatrix = glm::perspective(glm::radians(35.0f), (float)width / (float)height, 0.1f, 100.0f);
+        projMatrix = glm::perspective(glm::radians(35.0f), (float)800/600, 0.1f, 100.0f);
 
         // Bind your VAO (not necessary if you have only one)
         VAO.bind();
@@ -567,7 +634,7 @@ int main(void)
 
         // Bind your program
         program.bind();
-
+        VBO.bind();
         // Set the uniform values
         glUniform3f(program.uniform("triangleColor"), 1.0f, 0.5f, 0.0f);
         glUniform3f(program.uniform("camPos"), cameraPos.x, cameraPos.y, cameraPos.z);
@@ -578,29 +645,48 @@ int main(void)
         glUniform3fv(program.uniform("lightPos"), 1, glm::value_ptr(glm::vec3(-1.0f, 2.0f, 3.0f)));
         // x: ambient; 
         glUniform3f(program.uniform("lightParams"), 0.1f, 50.0f, 0.0f);
+        glUniform1i(program.uniform("tex"), 0);
 
         // Clear the framebuffer
         glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+        
         // Enable depth test
         glEnable(GL_DEPTH_TEST);
         
-        // Draw a triangle
-        //glDrawArrays(GL_TRIANGLES, 0, V.size());
-
+        //bind texture1 and draw it to framebuffer
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
+        
         glDrawElements(GL_TRIANGLES, T.size() * 3, GL_UNSIGNED_INT, 0);
 
+        //switch to window
+        VAO2.bind();
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0,0,width,height);
+
+		// Clear the screen
+		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        program2.bind();
+        VBO2.bind();
+        //CODE TO RENDER TO WINDOW
+        glUniform1i(program2.uniform("renderedTexture"), 0);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, renderedTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        
         // Swap front and back buffers
         glfwSwapBuffers(window);
-
         // Poll for and process events
         glfwPollEvents();
     }
 
     // Deallocate opengl memory
     program.free();
+    //program2.free();
+    //VBO2.free();
     VAO.free();
     VBO.free();
     TBO.free();
