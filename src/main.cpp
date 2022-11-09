@@ -520,9 +520,9 @@ int main(void)
     program.bindVertexAttribArray("texCoords", TBO);
 
 
-    unsigned int texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);  
+    unsigned int origTexture;
+    glGenTextures(1, &origTexture);
+    glBindTexture(GL_TEXTURE_2D, origTexture);  
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -559,37 +559,45 @@ int main(void)
     
     
     
-    // The framebuffer, which regroups 0, 1, or more textures, and 0 or 1 depth buffer.
-	GLuint FramebufferName = 0;
-	glGenFramebuffers(1, &FramebufferName);
-	glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
+    unsigned int gBuffer;
+    glGenFramebuffers(1, &gBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+    unsigned int gPosition, gColor, gNormal;
+    glGenTextures(1, &gPosition);
+    glBindTexture(GL_TEXTURE_2D, gPosition);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 800, 600, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
+
+    glGenTextures(1, &gColor);
+    glBindTexture(GL_TEXTURE_2D, gColor);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 800, 600, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gColor, 0);
+
+    glGenTextures(1, &gNormal);
+    glBindTexture(GL_TEXTURE_2D, gNormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 800, 600, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gNormal, 0);
 
     
-	// The texture we're going to render to
-	GLuint renderedTexture;
-	glGenTextures(1, &renderedTexture);
-	
-	// "Bind" the newly created texture : all future texture functions will modify this texture
-	glBindTexture(GL_TEXTURE_2D, renderedTexture);
-
-	glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, 800, 600, 0,GL_RGB, GL_UNSIGNED_BYTE, 0);
-
-
+    GLuint gDepth;
+    glGenTextures(1, &gDepth);
+	glBindTexture(GL_TEXTURE_2D, gDepth);
+	glTexImage2D(GL_TEXTURE_2D, 0,GL_DEPTH_COMPONENT24, 800, 600, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    
-	// Set "renderedTexture" as our colour attachement #0
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderedTexture, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, gDepth, 0);
 
-	// Set the list of draw buffers.
-	GLenum DrawBuffers[1] = {GL_COLOR_ATTACHMENT0};
-	glDrawBuffers(1, DrawBuffers); // "1" is the size of DrawBuffers
-
-	// Always check that our framebuffer is ok
-	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-	    return false;
+    // tell OpenGL which color attachments we'll use (of this framebuffer) for rendering 
+    unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
+    glDrawBuffers(3, attachments);
     
 
     // Register the keyboard callback
@@ -619,12 +627,12 @@ int main(void)
     	glEnable(GL_CULL_FACE);
 
         
-        glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
+        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 		glViewport(0,0,width,height);
 
         // matrix calculations
         viewMatrix = glm::lookAt(cameraPos, cameraTarget, cameraUp);
-        projMatrix = glm::perspective(glm::radians(35.0f), (float)800/600, 0.1f, 100.0f);
+        projMatrix = glm::perspective(glm::radians(35.0f), (float)width/height, 0.1f, 100.0f);
 
         // Bind your VAO (not necessary if you have only one)
         VAO.bind();
@@ -636,19 +644,18 @@ int main(void)
         program.bind();
         VBO.bind();
         // Set the uniform values
-        glUniform3f(program.uniform("triangleColor"), 1.0f, 0.5f, 0.0f);
-        glUniform3f(program.uniform("camPos"), cameraPos.x, cameraPos.y, cameraPos.z);
+       // 
         glUniformMatrix4fv(program.uniform("modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
         glUniformMatrix4fv(program.uniform("viewMatrix"), 1, GL_FALSE, glm::value_ptr(viewMatrix));
         glUniformMatrix4fv(program.uniform("projMatrix"), 1, GL_FALSE, glm::value_ptr(projMatrix));
         // direction towards the light
-        glUniform3fv(program.uniform("lightPos"), 1, glm::value_ptr(glm::vec3(-1.0f, 2.0f, 3.0f)));
+        //
         // x: ambient; 
-        glUniform3f(program.uniform("lightParams"), 0.1f, 50.0f, 0.0f);
+        //
         glUniform1i(program.uniform("tex"), 0);
 
         // Clear the framebuffer
-        glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         // Enable depth test
@@ -656,7 +663,7 @@ int main(void)
         
         //bind texture1 and draw it to framebuffer
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
+        glBindTexture(GL_TEXTURE_2D, origTexture);
         
         glDrawElements(GL_TRIANGLES, T.size() * 3, GL_UNSIGNED_INT, 0);
 
@@ -664,6 +671,7 @@ int main(void)
         VAO2.bind();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glViewport(0,0,width,height);
+        //glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderedTexture, 0);
 
 		// Clear the screen
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -671,10 +679,25 @@ int main(void)
         program2.bind();
         VBO2.bind();
         //CODE TO RENDER TO WINDOW
-        glUniform1i(program2.uniform("renderedTexture"), 0);
+        glUniform1i(program2.uniform("position"), 1);
+        glUniform1i(program2.uniform("color"), 0);
+        glUniform1i(program2.uniform("normal"), 2);
+        glUniform1i(program2.uniform("depth"), 3);
+
+        glUniform3f(program2.uniform("camPos"), cameraPos.x, cameraPos.y, cameraPos.z);
+        glUniform3fv(program2.uniform("lightPos"), 1, glm::value_ptr(glm::vec3(-1.0f, 2.0f, 3.0f)));
+        glUniform3f(program2.uniform("lightParams"), 0.1f, 50.0f, 0.0f);
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, renderedTexture);
+        glBindTexture(GL_TEXTURE_2D, gPosition);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, gColor);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, gNormal);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, gDepth);
+
+
         glDrawArrays(GL_TRIANGLES, 0, 6);
         
         // Swap front and back buffers
