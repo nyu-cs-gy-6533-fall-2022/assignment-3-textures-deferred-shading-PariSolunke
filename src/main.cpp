@@ -432,7 +432,7 @@ int main(void)
     glm::mat4 modelMatrix = glm::mat4(1.0f);
 
     // 1: generate sphere, 0: load OFF model
-#if 1
+#if 0
     // generate sphere (radius, #sectors, #stacks, vertices, normals, triangle indices)
     sphere(1.0f, 20, 10, V, VN, T);
     VBO.update(V);
@@ -519,7 +519,7 @@ int main(void)
     program.bindVertexAttribArray("normal", NBO);
     program.bindVertexAttribArray("texCoords", TBO);
 
-
+    /*
     unsigned int origTexture;
     glGenTextures(1, &origTexture);
     glBindTexture(GL_TEXTURE_2D, origTexture);  
@@ -529,7 +529,7 @@ int main(void)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.w, image.h, 0, GL_RGB, GL_UNSIGNED_BYTE, &image.data[0]);
     glGenerateMipmap(GL_TEXTURE_2D);
-    
+    */
     VertexArrayObject VAO2;
     VAO2.init();
     VAO2.bind();
@@ -556,8 +556,6 @@ int main(void)
     quadVertices.push_back(glm::vec3(1.0f,  1.0f, 0.0f));
     VBO2.update(quadVertices);
     program2.bindVertexAttribArray("position", VBO2);
-    
-    
     
     unsigned int gBuffer;
     glGenFramebuffers(1, &gBuffer);
@@ -644,14 +642,11 @@ int main(void)
         program.bind();
         VBO.bind();
         // Set the uniform values
-       // 
+        glUniform3f(program.uniform("triangleColor"), 1.0f, 0.5f, 0.0f);
         glUniformMatrix4fv(program.uniform("modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
         glUniformMatrix4fv(program.uniform("viewMatrix"), 1, GL_FALSE, glm::value_ptr(viewMatrix));
         glUniformMatrix4fv(program.uniform("projMatrix"), 1, GL_FALSE, glm::value_ptr(projMatrix));
-        // direction towards the light
-        //
-        // x: ambient; 
-        //
+ 
         glUniform1i(program.uniform("tex"), 0);
 
         // Clear the framebuffer
@@ -662,8 +657,8 @@ int main(void)
         glEnable(GL_DEPTH_TEST);
         
         //bind texture1 and draw it to framebuffer
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, origTexture);
+        //glActiveTexture(GL_TEXTURE0);
+        //glBindTexture(GL_TEXTURE_2D, origTexture);
         
         glDrawElements(GL_TRIANGLES, T.size() * 3, GL_UNSIGNED_INT, 0);
 
